@@ -1,0 +1,4 @@
+#!/bin/sh
+# Example sysext payload: the plugin wraps the directory source as usr/, so
+# this file lands at /usr/bin/corp-agent after the extension is merged.
+printf '%s\n' 'corp-agent ok'
