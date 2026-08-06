@@ -1,0 +1,15 @@
+<!-- Code generated from the comments of the Extension struct in provisioner/confext/provisioner.go; DO NOT EDIT MANUALLY -->
+
+- `name` (string) - Name is the extension name; it becomes the image/directory name on the
+  guest and the release-file name.
+
+- `source` (string) - Source is a local path: either a directory (packaged by the plugin) or
+  a prebuilt .raw disk image uploaded as-is.
+
+- `format` (string) - Format is the packaging format for directory sources: "directory"
+  (default), "squashfs", or "erofs". It is ignored for .raw sources.
+
+- `release_file` (string) - ReleaseFile is a user-supplied extension-release file that overrides
+  auto-generation. Directory sources only.
+
+<!-- End of code generated from the comments of the Extension struct in provisioner/confext/provisioner.go; -->

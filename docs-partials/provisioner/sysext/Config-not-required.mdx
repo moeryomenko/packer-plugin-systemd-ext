@@ -1,0 +1,16 @@
+<!-- Code generated from the comments of the Config struct in provisioner/sysext/provisioner.go; DO NOT EDIT MANUALLY -->
+
+- `extensions` ([]Extension) - Extensions lists the extension entries to apply.
+
+- `mode` (string) - Mode is the persistence strategy: "bake" (default) or "persist".
+
+- `merge_during_build` (bool) - MergeDuringBuild runs the merge during the build. Defaults to true when
+  the key is omitted; false is a meaningful explicit value.
+
+- `command` (string) - Command is the guest-side binary to invoke. Defaults to
+  systemd-sysext.
+
+- `guest_install_dir` (string) - GuestInstallDir is where extension images land on the guest. Defaults
+  to /var/lib/extensions.
+
+<!-- End of code generated from the comments of the Config struct in provisioner/sysext/provisioner.go; -->
