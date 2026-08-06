@@ -1,0 +1,5 @@
+packer-plugin-systemd-ext
+.agent/
+crash.log
+.docs
+coverage.out
