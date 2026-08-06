@@ -1,0 +1,10 @@
+# Generated at run time by run.sh
+.out/
+
+# Packer build/cache outputs
+output-*/
+packer_cache/
+
+# Ephemeral credentials
+ssh-key
+ssh-key.pub

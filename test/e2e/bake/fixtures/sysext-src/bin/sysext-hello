@@ -1,0 +1,4 @@
+#!/bin/sh
+# The plugin wraps this source as the usr/ subtree of the extension, so this
+# file lands at /usr/bin/sysext-hello in the baked image.
+printf '%s\n' 'E2E_SYSEXT_HELLO_OK'

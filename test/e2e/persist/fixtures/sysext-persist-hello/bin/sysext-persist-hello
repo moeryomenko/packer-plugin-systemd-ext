@@ -1,0 +1,8 @@
+#!/bin/sh
+# sysext-persist-hello — E2E fixture payload for the sysext provisioner.
+#
+# The sysext provisioner wraps the source directory as the usr/ subtree of
+# the extension, so this file lands at /usr/bin/sysext-persist-hello when the
+# extension is merged. assert.sh and assert-second-boot.sh execute it and
+# require this exact output.
+echo "hello from sysext persist"

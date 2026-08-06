@@ -1,0 +1,9 @@
+# Generated at run time by run.sh (seed, ssh key, logs, validate/build logs)
+.out/
+
+# Packer build/cache outputs
+output-*/
+packer_cache/
+
+# Manifest produced by the post-processor (consumed by run.sh)
+manifest.json
