@@ -1,0 +1,29 @@
+# E2E acceptance workflow — local-only scaffold.
+#
+# The E2E gate boots real VMs under cloud-hypervisor and requires /dev/kvm.
+# GitHub-hosted runners do not expose /dev/kvm, so this workflow never
+# targets a hosted runner image and has no automatic triggers: the canonical
+# execution is `make e2e` on a local KVM-capable host: bake harness then
+# persist harness, with fail-fast prereq checks.
+#
+# Manual dispatch runs ONLY on a self-hosted runner registered with the
+# `kvm` label. Without such a runner, dispatching this workflow will queue
+# indefinitely — the job below is intentionally the same command that a
+# developer runs locally (`make e2e`).
+name: e2e
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: E2E (bake + persist) on self-hosted KVM runner
+    runs-on: [self-hosted, kvm]
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run the local E2E gate
+        run: make e2e
