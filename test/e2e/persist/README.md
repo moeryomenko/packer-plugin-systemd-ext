@@ -195,6 +195,26 @@ by `run.sh`. No NAT is required for direct host→guest SSH.
   label `cidata`) attached to build 1 only. Build 2 boots the provisioned
   artifact without a seed: the guest network config (netplan), the ubuntu
   user, and the persisted extensions are baked into the artifact by build 1.
+- **Per-run unique instance-id**: `run.sh` writes a fresh
+  `INSTANCE_ID="packer-persist-e2e-$(date +%s)"` into the NoCloud seed's
+  `meta-data` on every run. A constant instance-id makes cloud-init treat a
+  reused writable raw disk as the same instance (`new=False`) and never re-apply
+  the seed network-config, so the guest never configures `192.168.249.2` and the
+  packer SSH communicator hangs. The unique id forces a fresh instance on every
+  run. Build 2 is unaffected: it boots the build-1 artifact without a seed and
+  relies on the netplan baked in by build 1, not cloud-init.
+- **Build 1 always boots a fresh raw conversion**: `run.sh` deletes the
+  previous run's `.out/assets/*.raw` and re-converts the pinned qcow2 before
+  build 1, so every run boots a pristine base image (the qcow2 fetch+checksum
+  cache is kept). Persist mode mutates the disk by design — it leaves
+  extension images in `/var/lib/extensions` and `/var/lib/confexts` and enables
+  `systemd-sysext.service` / `systemd-confext.service` — so reusing the writable
+  disk across runs broke the next boot: the enabled boot services auto-merged
+  `/usr` at boot and the provisioner's explicit `merge` failed with
+  `Hierarchy '/usr' is already merged`. The validated Aug 6 pass ran on a fresh
+  disk; the unconditional fresh conversion restores that first-boot condition
+  every run and keeps the gate re-runnable. Build 2 is unaffected: it boots the
+  build-1 artifact from `output-persist/`, which is produced fresh each run.
 - **Merged-state assertion**: `systemd-sysext status` historically prints
   `STATUS: MERGED` (systemd >= 255) or `SYSEXTS ARE MERGED` (< 255) when
   merged; systemd 255.4 on Ubuntu 24.04 instead prints a table whose merged

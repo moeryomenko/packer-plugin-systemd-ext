@@ -333,6 +333,14 @@ if ! ip addr show dev "${TAP_DEVICE}" | grep -q "${TAP_HOST_IP}/"; then
 fi
 sudo ip link set "${TAP_DEVICE}" up || fail "cannot bring ${TAP_DEVICE} up"
 
+# cloud-hypervisor needs CAP_NET_ADMIN to attach the existing TAP
+# (TUNSETIFF). Grant it when the harness is not running as root.
+if [ "$(id -u)" != "0" ]; then
+    CH_BIN="$(command -v cloud-hypervisor)"
+    sudo setcap cap_net_admin+ep "${CH_BIN}" \
+        || fail "setcap cap_net_admin+ep on ${CH_BIN} failed: cloud-hypervisor cannot attach ${TAP_DEVICE} without CAP_NET_ADMIN"
+fi
+
 # ---------------------------------------------------------------------------
 # 5. fixtures: prebuilt .raw (squashfs) with a matching in-image release file
 # ---------------------------------------------------------------------------
@@ -390,8 +398,13 @@ printf 'systemd-dissect for guest ready: %s\n' "${DISSECT_BIN}"
 # 6. cloud-init NoCloud seed (static guest IP + ubuntu/uid-0 user data)
 # ---------------------------------------------------------------------------
 printf '\n== [6/8] generating cloud-init seed ==\n'
-cat > "${SEED_DIR}/meta-data" <<'EOF'
-instance-id: packer-bake-e2e
+# Per-run unique NoCloud instance-id: a constant id makes cloud-init treat the
+# reused writable raw disk as the same instance (new=False) and never re-apply
+# the seed network-config, so the guest never gets the static IP the packer SSH
+# communicator needs (see README "Notes and design decisions").
+INSTANCE_ID="packer-bake-e2e-$(date +%s)"
+cat > "${SEED_DIR}/meta-data" <<EOF
+instance-id: ${INSTANCE_ID}
 local-hostname: bake-e2e
 EOF
 
@@ -481,6 +494,11 @@ fi
 
 printf '\n== [8/8] packer build (cloud-hypervisor firmware boot, systemd >= 255 guest) ==\n'
 printf 'image checksum pin: %s\n' "${IMAGE_SHA256}"
+# Run the build from the harness dir so the artifact (output-bake/) lands here
+# where .gitignore covers output-*/ instead of at the repo root (mirrors
+# persist/run.sh). The template resolves all paths via ${path.root}, so the
+# working directory does not affect path resolution.
+cd "${ROOT}" || exit 1
 "${PACKER_BIN}" build "${BUILD_ARGS[@]}" "${ROOT}/template.pkr.hcl" \
     | tee "${OUT}/build.log"
 

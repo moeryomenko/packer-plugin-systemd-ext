@@ -46,6 +46,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -483,6 +484,65 @@ func TestHarnessScanSkipPolicy(t *testing.T) {
 			}
 		})
 	}
+}
+
+// --- seed instance freshness + bake setcap parity --------------------------
+
+// seedInstanceIDTimestampToken matches a `date +%s`-style per-run timestamp
+// token (e.g. `$(date +%s)` or `$(date +%s%N)`), the evidence that a harness
+// generates a unique NoCloud instance-id per run instead of reusing the
+// constant id cloud-init cached on a previously booted raw disk.
+var seedInstanceIDTimestampToken = regexp.MustCompile(`date[^\n]*\+%s`)
+
+// seedInstanceIDInterpolation matches an `instance-id: ${VAR}` meta-data
+// line, the alternative acceptable form where a variable carries the per-run
+// id into the heredoc.
+var seedInstanceIDInterpolation = regexp.MustCompile(`instance-id:\s*\$\{[A-Za-z_][A-Za-z0-9_]*\}`)
+
+// TestHarnessSeedInstanceFreshness asserts both harness runners generate a
+// per-run unique NoCloud instance-id. A constant instance-id (e.g.
+// `instance-id: packer-bake-e2e`) makes cloud-init treat a reused writable
+// raw disk as the SAME instance (new=False) and never re-apply the seed
+// network-config, so the guest never gets the 10.0.2.2 / 192.168.249.2
+// address the packer SSH communicator needs. Each file and each assertion is
+// an independent t.Run subtest so partial failures are clear.
+func TestHarnessSeedInstanceFreshness(t *testing.T) {
+	root := repoRoot(t)
+	for _, rel := range []string{"bake/run.sh", "persist/run.sh"} {
+		rel := rel
+		data := mustReadRepoFile(t, root, "test/e2e/"+rel)
+		t.Run(subtestName(rel)+"_unique_instance_id", func(t *testing.T) {
+			if !seedInstanceIDTimestampToken.Match(data) && !seedInstanceIDInterpolation.Match(data) {
+				t.Errorf("%s must generate a per-run unique NoCloud instance-id: a `date +%%s`-style token or an instance-id variable interpolation into meta-data", rel)
+			}
+		})
+		t.Run(subtestName(rel)+"_no_constant_instance_id", func(t *testing.T) {
+			// Compare whole trimmed lines, not substrings: the fixed unique
+			// form `instance-id: packer-bake-e2e-$(date +%s)` legitimately
+			// contains the constant as a prefix and must not be flagged.
+			constants := []string{
+				"instance-id: packer-bake-e2e",
+				"instance-id: packer-persist-e2e",
+			}
+			for _, line := range bytes.Split(data, []byte("\n")) {
+				trimmed := string(bytes.TrimSpace(line))
+				for _, c := range constants {
+					if trimmed == c {
+						t.Errorf("%s must not hardcode the constant instance-id %q (a per-run unique id is required)", rel, c)
+					}
+				}
+			}
+		})
+	}
+}
+
+// TestBakeRunShSetcapParity asserts the bake harness grants cloud-hypervisor
+// CAP_NET_ADMIN so it can attach the pre-created TAP (TUNSETIFF) on a fresh
+// host, mirroring the conditional setcap block in test/e2e/persist/run.sh.
+func TestBakeRunShSetcapParity(t *testing.T) {
+	root := repoRoot(t)
+	data := mustReadRepoFile(t, root, "test/e2e/bake/run.sh")
+	assertContains(t, "bake/run.sh", data, []string{"setcap cap_net_admin+ep"})
 }
 
 // subtestName turns an arbitrary string into a flat, stable t.Run name.

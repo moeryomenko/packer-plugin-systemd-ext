@@ -42,6 +42,7 @@ the tree and the tool requirement is explicit.
 | `qemu-img` | qcow2 -> raw conversion | hard prerequisite |
 | `go` (>= 1.26) + `make` | plugin builds | builds the systemd-ext plugin and the pinned cloud-hypervisor plugin from source |
 | TAP + root/sudo | guest networking | `sudo ip tuntap add dev ch-tap-0 mode tap` |
+| `setcap` (libcap) + root/sudo | cloud-hypervisor TAP attach | grants the cloud-hypervisor binary `cap_net_admin+ep` so it can attach the existing TAP device; only needed when the harness does not run as root |
 | `mksquashfs` + `unsquashfs` | raw fixture | package `squashfs-tools` |
 | `ar` + `tar --zstd` | guest `systemd-dissect` extraction | from the pinned `systemd-container` .deb (see below) |
 | `cloud-localds` / `genisoimage` / `xorriso` | cloud-init seed ISO | any one; `xorriso` ships on most distros |
@@ -169,6 +170,14 @@ The suite is **skippable but never silently false-green**:
   it" from "image preset". `assert.sh` prints the state as evidence.
 - **TAP cleanup**: `run.sh` deletes `ch-tap-0` on exit only when it created
   the device; a pre-existing TAP is reused and left untouched.
+- **Per-run unique instance-id**: `run.sh` writes a fresh
+  `INSTANCE_ID="packer-bake-e2e-$(date +%s)"` into the NoCloud seed's
+  `meta-data` on every run. A constant instance-id makes cloud-init treat a
+  reused writable raw disk as the same instance (`new=False`) and never re-apply
+  the seed network-config, so the guest never configures `10.0.2.2` and the
+  packer SSH communicator hangs at "Waiting for SSH to become available...".
+  The unique id forces a new instance, so the seed network config is applied on
+  every run; the raw disk conversion cache stays valid across runs.
 - Generated state under `.out/` (raw, seed, ssh-free fixtures, logs) and
   `output-*/` / `packer_cache/` build outputs are gitignored — inspect them
   for debugging.

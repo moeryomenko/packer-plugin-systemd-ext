@@ -240,20 +240,32 @@ IMAGE_QCOW2="${ASSETS_DIR}/${IMAGE_NAME}.img"
 fetch "${IMAGE_URL}" "${IMAGE_QCOW2}" "${IMAGE_SHA256}" "Ubuntu 24.04 cloud image"
 
 RAW_DISK="${ASSETS_DIR}/${IMAGE_NAME}.raw"
-if [ ! -f "${RAW_DISK}" ]; then
-    printf 'converting cloud image to raw (qemu-img convert) ...\n'
-    qemu-img convert -O raw "${IMAGE_QCOW2}" "${RAW_DISK}" \
-        || fail "qemu-img convert qcow2 -> raw failed"
-fi
-printf 'raw disk: %s\n' "${RAW_DISK}"
+# Fresh writable disk every run: persist mode mutates the disk by design
+# (leaves extension images in /var/lib/extensions and /var/lib/confexts and
+# enables systemd-sysext.service / systemd-confext.service). Reusing the
+# previous run's raw carries that state: the enabled boot services auto-merge
+# /usr at boot, so the provisioner's explicit merge fails with "Hierarchy
+# '/usr' is already merged". Deleting the stale raw and re-converting restores
+# the clean-first-boot conditions of the validated Aug 6 pass. The qcow2
+# fetch+checksum cache above is untouched (that is not the problem).
+rm -f "${RAW_DISK}"
+printf 'converting cloud image to raw (qemu-img convert) ...\n'
+qemu-img convert -O raw "${IMAGE_QCOW2}" "${RAW_DISK}" \
+    || fail "qemu-img convert qcow2 -> raw failed"
+printf 'raw disk: %s (fresh conversion this run)\n' "${RAW_DISK}"
 
 # ---------------------------------------------------------------------------
 # 4. cloud-init NoCloud seed + TAP + CH capability
 # ---------------------------------------------------------------------------
 printf '\n== [4/8] seed disk, TAP, CH capability ==\n'
 
-cat > "${SEED_DIR}/meta-data" <<'EOF'
-instance-id: packer-persist-e2e
+# Per-run unique NoCloud instance-id: a constant id makes cloud-init treat the
+# reused writable raw disk as the same instance (new=False) and never re-apply
+# the seed network-config, so the guest never gets the static IP the packer SSH
+# communicator needs (see README "Design notes").
+INSTANCE_ID="packer-persist-e2e-$(date +%s)"
+cat > "${SEED_DIR}/meta-data" <<EOF
+instance-id: ${INSTANCE_ID}
 local-hostname: persist-e2e
 EOF
 
