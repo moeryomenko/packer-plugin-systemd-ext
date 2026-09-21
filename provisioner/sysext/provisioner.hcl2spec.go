@@ -21,6 +21,7 @@ type FlatConfig struct {
 	Extensions          []FlatExtension   `mapstructure:"extensions" cty:"extensions" hcl:"extensions"`
 	Mode                *string           `mapstructure:"mode" cty:"mode" hcl:"mode"`
 	MergeDuringBuild    *bool             `mapstructure:"merge_during_build" cty:"merge_during_build" hcl:"merge_during_build"`
+	EnableOnBoot        *bool             `mapstructure:"enable_on_boot" cty:"enable_on_boot" hcl:"enable_on_boot"`
 	Command             *string           `mapstructure:"command" cty:"command" hcl:"command"`
 	GuestInstallDir     *string           `mapstructure:"guest_install_dir" cty:"guest_install_dir" hcl:"guest_install_dir"`
 }
@@ -48,6 +49,7 @@ func (*FlatConfig) HCL2Spec() map[string]hcldec.Spec {
 		"extensions":                 &hcldec.BlockListSpec{TypeName: "extensions", Nested: hcldec.ObjectSpec((*FlatExtension)(nil).HCL2Spec())},
 		"mode":                       &hcldec.AttrSpec{Name: "mode", Type: cty.String, Required: false},
 		"merge_during_build":         &hcldec.AttrSpec{Name: "merge_during_build", Type: cty.Bool, Required: false},
+		"enable_on_boot":             &hcldec.AttrSpec{Name: "enable_on_boot", Type: cty.Bool, Required: false},
 		"command":                    &hcldec.AttrSpec{Name: "command", Type: cty.String, Required: false},
 		"guest_install_dir":          &hcldec.AttrSpec{Name: "guest_install_dir", Type: cty.String, Required: false},
 	}

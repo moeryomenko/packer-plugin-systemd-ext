@@ -310,6 +310,26 @@ func TestPersistNoMergeWhenMergeDuringBuildFalse(t *testing.T) {
 	}
 }
 
+func TestPersistSkipsBootServiceWhenDisabled(t *testing.T) {
+	var p Provisioner
+	cfg := sysextPersistConfig(t)
+	cfg["merge_during_build"] = false
+	cfg["enable_on_boot"] = false
+	if err := p.Prepare(cfg); err != nil {
+		t.Fatalf("Prepare: %v", err)
+	}
+	comm := newBakeComm(`ID=ubuntu
+VERSION_ID=24.04
+`, persistNoMergeResponses("systemd-sysext")...)
+	if err := provisionPersist(t, &p, testUi(), comm); err != nil {
+		t.Fatalf("Provision: %v", err)
+	}
+	assertNoMergeStateCommands(t, comm.commands)
+	if got := countToken(comm.commands, "enable"); got != 0 {
+		t.Errorf("issued %d 'enable' tokens, want none", got)
+	}
+}
+
 func TestPersistServiceEnableFailed(t *testing.T) {
 	// The systemctl is-enabled verification fails on a non-zero exit (the
 	// realistic "disabled" variant) -> SERVICE_ENABLE_FAILED, with the code,

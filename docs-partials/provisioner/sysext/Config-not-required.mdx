@@ -7,6 +7,9 @@
 - `merge_during_build` (bool) - MergeDuringBuild runs the merge during the build. Defaults to true when
   the key is omitted; false is a meaningful explicit value.
 
+- `enable_on_boot` (bool) - EnableOnBoot enables the standard systemd extension service. Defaults to
+  true for compatibility; callers that manage delayed activation set false.
+
 - `command` (string) - Command is the guest-side binary to invoke. Defaults to
   systemd-sysext.
 

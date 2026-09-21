@@ -44,8 +44,10 @@ func bootServiceUnit(typ ExtensionType) string {
 //     is-enabled <boot service>`; a non-zero verification exit fails with
 //     SERVICE_ENABLE_FAILED.
 //
-// When mergeDuringBuild is false no status/merge/unmerge commands are issued:
-// the enabled boot service performs the merge at first boot.
+// When mergeDuringBuild is false no status/merge/unmerge commands are issued.
+// When enableOnBoot is false, persist leaves activation to the caller (for
+// example, a delayed first-boot merge service) and does not touch the stock
+// systemd extension service.
 // Artifacts remain in the install directory — persist never issues rm.
 // Running Persist twice yields the same command
 // stream each run: exactly one merge per run when mergeDuringBuild is true,
@@ -53,7 +55,16 @@ func bootServiceUnit(typ ExtensionType) string {
 // enable + is-enabled per run even when the unit is already enabled —
 // enablement is always issued. All commands are plain argv,
 // never through a shell.
-func Persist(ctx context.Context, ui packersdk.Ui, comm packersdk.Communicator, typ ExtensionType, command string, ext PersistExtension, mergeDuringBuild bool) error {
+func Persist(
+	ctx context.Context,
+	ui packersdk.Ui,
+	comm packersdk.Communicator,
+	typ ExtensionType,
+	command string,
+	ext PersistExtension,
+	mergeDuringBuild bool,
+	enableOnBoot bool,
+) error {
 	if mergeDuringBuild {
 		statusOut, _, err := run(ctx, comm, StatusArgs(command))
 		if err != nil {
@@ -72,6 +83,10 @@ func Persist(ctx context.Context, ui packersdk.Ui, comm packersdk.Communicator, 
 		if _, _, err := run(ctx, comm, MergeArgs(command)); err != nil {
 			return persistMergeError(strings.Join(MergeArgs(command), " "), err)
 		}
+	}
+
+	if !enableOnBoot {
+		return nil
 	}
 
 	// Always enable the boot service — even when it is already enabled — and

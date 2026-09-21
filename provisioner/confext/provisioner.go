@@ -8,6 +8,7 @@
 package confext
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -61,6 +62,9 @@ type Config struct {
 	// MergeDuringBuild runs the merge during the build. Defaults to true when
 	// the key is omitted; false is a meaningful explicit value.
 	MergeDuringBuild bool `mapstructure:"merge_during_build"`
+	// EnableOnBoot enables the standard systemd extension service. Defaults to
+	// true for compatibility; callers that manage delayed activation set false.
+	EnableOnBoot bool `mapstructure:"enable_on_boot"`
 	// Command is the guest-side binary to invoke. Defaults to
 	// systemd-confext.
 	Command string `mapstructure:"command"`
@@ -137,6 +141,9 @@ func (p *Provisioner) Prepare(raws ...interface{}) error {
 	}
 	if !rawHasKey(raws, "merge_during_build") {
 		p.config.MergeDuringBuild = true
+	}
+	if !rawHasKey(raws, "enable_on_boot") {
+		p.config.EnableOnBoot = true
 	}
 	if p.config.Command == "" {
 		p.config.Command = defaultCommand
@@ -294,7 +301,7 @@ func (p *Provisioner) provisionPersist(ctx context.Context, ui packersdk.Ui, com
 		comm,
 		typ,
 		func(ctx context.Context, ui packersdk.Ui, comm packersdk.Communicator, placed guestops.BakeExtension) error {
-			if err := guestops.Persist(ctx, ui, comm, typ, p.config.Command, guestops.PersistExtension{Name: placed.Name}, p.config.MergeDuringBuild); err != nil {
+			if err := guestops.Persist(ctx, ui, comm, typ, p.config.Command, guestops.PersistExtension{Name: placed.Name}, p.config.MergeDuringBuild, p.config.EnableOnBoot); err != nil {
 				return err
 			}
 			ui.Say(fmt.Sprintf("confext: persisted extension %s", placed.Name))
@@ -321,13 +328,13 @@ func (p *Provisioner) provisionFlow(
 
 	// Read the guest /etc/os-release once per run, only when a directory
 	// source needs release-file generation.
-	var osRelease io.Reader
+	var osRelease []byte
 	if needsOSRelease(p.config.Extensions) {
 		var sb strings.Builder
 		if err := comm.Download("/etc/os-release", &sb); err != nil {
 			return &guestops.Error{Code: guestops.CodeDownloadFailed, Op: "download /etc/os-release", Detail: err.Error()}
 		}
-		osRelease = strings.NewReader(sb.String())
+		osRelease = []byte(sb.String())
 	}
 
 	for i := range p.config.Extensions {
@@ -339,7 +346,7 @@ func (p *Provisioner) provisionFlow(
 
 		var placed guestops.BakeExtension
 		if info.IsDir() {
-			placed, err = p.packageAndPlaceDirectory(ctx, comm, typ, ext, osRelease)
+			placed, err = p.packageAndPlaceDirectory(ctx, comm, typ, ext, bytes.NewReader(osRelease))
 		} else {
 			placed, err = p.placeRawSource(ctx, comm, typ, ext)
 		}
